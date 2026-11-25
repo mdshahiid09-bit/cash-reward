@@ -2,7 +2,6 @@ import React from 'react'
 import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { Navbar } from './Navbar'
 import { BottomNav } from './BottomNav'
-import { Sidebar } from './Sidebar'
 import { useAuth } from '../../context/AuthContext'
 import { useOffline } from '../../hooks/useOffline'
 import { BlockedScreen } from '../modals/BlockedScreen'
@@ -24,7 +23,7 @@ export const AppLayout: React.FC = () => {
         </div>
         <div className="flex items-center gap-2 text-slate-400 text-sm font-medium">
           <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-          <span>Verifying secure session...</span>
+          <span>Loading Cash Reward...</span>
         </div>
       </div>
     )
@@ -46,7 +45,10 @@ export const AppLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row antialiased selection:bg-emerald-500 selection:text-slate-950">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center antialiased selection:bg-emerald-500 selection:text-slate-950 relative">
+      {/* Background ambient light */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md h-80 bg-emerald-500/5 blur-[130px] rounded-full pointer-events-none" />
+
       {/* Offline Alert Bar */}
       {isOffline && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-rose-600 text-white text-xs font-semibold py-1.5 px-4 flex items-center justify-center gap-2 shadow-lg">
@@ -55,18 +57,15 @@ export const AppLayout: React.FC = () => {
         </div>
       )}
 
-      {/* Desktop Sidebar */}
-      <Sidebar />
+      {/* Top Navbar */}
+      <Navbar />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <Navbar />
-        <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 pb-24 md:pb-8">
-          <Outlet />
-        </main>
-      </div>
+      {/* Native Mobile App Container */}
+      <main className="w-full max-w-lg mx-auto p-4 sm:p-5 pb-28 min-h-[calc(100vh-60px)]">
+        <Outlet />
+      </main>
 
-      {/* Mobile Bottom Navigation */}
+      {/* Floating Bottom App Navigation */}
       <BottomNav />
 
       {/* Welcome Bonus Modal on First Login */}
