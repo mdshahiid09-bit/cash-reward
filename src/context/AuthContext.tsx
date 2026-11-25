@@ -9,6 +9,8 @@ interface AuthContextType {
   profile: Profile | null
   loading: boolean
   siteSettings: SiteSettings | null
+  authError: string | null
+  clearAuthError: () => void
   signInWithGoogle: (refCode?: string) => Promise<void>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
@@ -24,9 +26,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState<string | null>(null)
   const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null)
   const [showWelcomeModal, setShowWelcomeModal] = useState(false)
   const [welcomeBonusAmount, setWelcomeBonusAmount] = useState(25)
+
+  // Clear any existing auth errors
+  const clearAuthError = useCallback(() => {
+    setAuthError(null)
+  }, [])
 
   // Load site settings
   const fetchSettings = useCallback(async () => {
@@ -127,6 +135,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     fetchSettings()
 
+    // Check URL parameters for OAuth errors (e.g. from Google or Supabase)
+    const hash = window.location.hash
+    const search = window.location.search
+
+    const getParam = (str: string, key: string) => {
+      const clean = str.startsWith('#') || str.startsWith('?') ? str.slice(1) : str
+      const params = new URLSearchParams(clean)
+      return params.get(key)
+    }
+
+    const errorDesc = getParam(hash, 'error_description') || getParam(search, 'error_description')
+    const errorCode = getParam(hash, 'error') || getParam(search, 'error')
+
+    if (errorDesc || errorCode) {
+      const msg = decodeURIComponent((errorDesc || errorCode || 'Google authentication failed').replace(/\+/g, ' '))
+      setAuthError(msg)
+      // Clean up the URL without reloading
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+
     // Listen to session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
@@ -152,17 +180,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [fetchSettings, loadProfile])
 
   const signInWithGoogle = async (refCode?: string) => {
-    if (refCode && refCode.trim()) {
-      localStorage.setItem('cr_pending_ref', refCode.trim().toUpperCase())
-    }
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin
+    setAuthError(null)
+    try {
+      if (refCode && refCode.trim()) {
+        localStorage.setItem('cr_pending_ref', refCode.trim().toUpperCase())
       }
-    })
-    if (error) {
-      throw error
+      
+      const currentOrigin = window.location.origin
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${currentOrigin}/`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent'
+          }
+        }
+      })
+      if (error) {
+        setAuthError(error.message)
+        throw error
+      }
+    } catch (err: any) {
+      const msg = err?.message || 'Google sign-in could not be initiated.'
+      setAuthError(msg)
+      throw err
     }
   }
 
@@ -204,6 +246,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profile,
         loading,
         siteSettings,
+        authError,
+        clearAuthError,
         signInWithGoogle,
         signOut,
         refreshProfile,
