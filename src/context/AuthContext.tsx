@@ -4,12 +4,21 @@ import { supabase } from '../lib/supabase'
 import { Profile, SiteSettings } from '../types'
 import { sound } from '../lib/audio'
 
+export interface AuthErrorDetails {
+  error: string
+  errorDescription: string
+  errorCode?: string
+  errorUri?: string
+  raw?: string
+}
+
 interface AuthContextType {
   user: User | null
   profile: Profile | null
   loading: boolean
   siteSettings: SiteSettings | null
   authError: string | null
+  authErrorDetails: AuthErrorDetails | null
   clearAuthError: () => void
   signInWithGoogle: (refCode?: string) => Promise<void>
   signOut: () => Promise<void>
@@ -27,6 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [authErrorDetails, setAuthErrorDetails] = useState<AuthErrorDetails | null>(null)
   const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null)
   const [showWelcomeModal, setShowWelcomeModal] = useState(false)
   const [welcomeBonusAmount, setWelcomeBonusAmount] = useState(25)
@@ -34,6 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Clear any existing auth errors
   const clearAuthError = useCallback(() => {
     setAuthError(null)
+    setAuthErrorDetails(null)
   }, [])
 
   // Load site settings
@@ -135,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     fetchSettings()
 
-    // Check URL parameters for OAuth errors (e.g. from Google or Supabase)
+    // Parse exact URL parameters and hash for OAuth errors
     const hash = window.location.hash
     const search = window.location.search
 
@@ -145,13 +156,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return params.get(key)
     }
 
+    const errorParam = getParam(hash, 'error') || getParam(search, 'error')
     const errorDesc = getParam(hash, 'error_description') || getParam(search, 'error_description')
-    const errorCode = getParam(hash, 'error') || getParam(search, 'error')
+    const errorCode = getParam(hash, 'error_code') || getParam(search, 'error_code')
+    const errorUri = getParam(hash, 'error_uri') || getParam(search, 'error_uri')
 
-    if (errorDesc || errorCode) {
-      const msg = decodeURIComponent((errorDesc || errorCode || 'Google authentication failed').replace(/\+/g, ' '))
-      setAuthError(msg)
-      // Clean up the URL without reloading
+    if (errorParam || errorDesc) {
+      const cleanDesc = errorDesc ? decodeURIComponent(errorDesc.replace(/\+/g, ' ')) : ''
+      const cleanErr = errorParam ? decodeURIComponent(errorParam.replace(/\+/g, ' ')) : 'Authentication Error'
+
+      const details: AuthErrorDetails = {
+        error: cleanErr,
+        errorDescription: cleanDesc || cleanErr,
+        errorCode: errorCode || undefined,
+        errorUri: errorUri || undefined,
+        raw: (hash || search).replace(/^[#?]/, '')
+      }
+
+      setAuthError(cleanDesc || cleanErr)
+      setAuthErrorDetails(details)
+
+      // Clean up the URL in browser without page refresh
       window.history.replaceState(null, '', window.location.pathname)
     }
 
@@ -181,29 +206,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = async (refCode?: string) => {
     setAuthError(null)
+    setAuthErrorDetails(null)
     try {
       if (refCode && refCode.trim()) {
         localStorage.setItem('cr_pending_ref', refCode.trim().toUpperCase())
       }
-      
-      const currentOrigin = window.location.origin
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${currentOrigin}/`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent'
-          }
+          redirectTo: window.location.origin
         }
       })
       if (error) {
         setAuthError(error.message)
+        setAuthErrorDetails({
+          error: error.name || 'OAuthError',
+          errorDescription: error.message
+        })
         throw error
       }
     } catch (err: any) {
       const msg = err?.message || 'Google sign-in could not be initiated.'
       setAuthError(msg)
+      setAuthErrorDetails({
+        error: 'ClientError',
+        errorDescription: msg
+      })
       throw err
     }
   }
@@ -247,6 +276,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         siteSettings,
         authError,
+        authErrorDetails,
         clearAuthError,
         signInWithGoogle,
         signOut,

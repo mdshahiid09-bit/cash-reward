@@ -8,18 +8,30 @@ import {
   Zap, 
   Users, 
   Gift, 
-  AlertCircle, 
+  AlertTriangle, 
   X, 
   ArrowRight, 
   CheckCircle2, 
   Wallet,
-  Lock
+  Lock,
+  RefreshCw,
+  ExternalLink,
+  HelpCircle
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { sound } from '../lib/audio'
 
 export const AuthLanding: React.FC = () => {
-  const { user, loading, signInWithGoogle, authError, clearAuthError, welcomeBonusAmount } = useAuth()
+  const { 
+    user, 
+    loading, 
+    signInWithGoogle, 
+    authError, 
+    authErrorDetails, 
+    clearAuthError, 
+    welcomeBonusAmount 
+  } = useAuth()
+  
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
 
@@ -53,6 +65,12 @@ export const AuthLanding: React.FC = () => {
       setIsSigningIn(false)
     }
   }
+
+  const isOrgInternalError = 
+    authError?.toLowerCase().includes('org_internal') ||
+    authError?.toLowerCase().includes('organization') ||
+    authError?.toLowerCase().includes('access_denied') ||
+    authErrorDetails?.errorDescription?.toLowerCase().includes('org_internal')
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-emerald-500 selection:text-slate-950 relative overflow-hidden">
@@ -120,28 +138,83 @@ export const AuthLanding: React.FC = () => {
           <span className="text-slate-200 font-medium"> UPI (GPay, PhonePe, Paytm)</span>, Bank Account, or Google Play Redeem Code.
         </motion.p>
 
-        {/* Error Notification Alert */}
+        {/* Detailed Google OAuth Error Screen & Diagnostics */}
         <AnimatePresence>
           {authError && (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md mb-6 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-left flex items-start gap-3 shadow-lg"
+              className="w-full max-w-lg mb-8 p-5 sm:p-6 rounded-3xl bg-slate-900/95 border-2 border-rose-500/40 text-rose-300 text-left shadow-2xl backdrop-blur-xl relative"
             >
-              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-              <div className="flex-1 text-xs sm:text-sm">
-                <p className="font-semibold text-rose-200">Authentication Error</p>
-                <p className="mt-0.5 text-rose-300/90 leading-snug">{authError}</p>
-                <p className="mt-1 text-[11px] text-rose-400">Please make sure popups/redirects are allowed and try again.</p>
+              {/* Top Banner Header */}
+              <div className="flex items-start justify-between gap-3 pb-3 border-b border-rose-500/20">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm sm:text-base font-bold text-white">Google Sign-In Failed</h2>
+                    <p className="text-[11px] text-rose-300/80">OAuth Authentication Error from Google</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={clearAuthError}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+                  title="Dismiss error"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <button 
-                onClick={clearAuthError}
-                className="text-rose-400 hover:text-rose-200 p-1"
-                title="Dismiss"
-              >
-                <X className="w-4 h-4" />
-              </button>
+
+              {/* Exact Error Details from URL Params */}
+              <div className="mt-3.5 space-y-2">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  Diagnosis & Error Text:
+                </span>
+                <div className="p-3 bg-slate-950/90 border border-rose-900/60 rounded-xl font-mono text-xs text-rose-200 break-words select-all leading-relaxed shadow-inner">
+                  {authErrorDetails?.errorCode && (
+                    <div className="text-[10px] text-rose-400/90 mb-1 font-semibold">
+                      CODE: {authErrorDetails.errorCode}
+                    </div>
+                  )}
+                  {authErrorDetails?.errorDescription || authError}
+                </div>
+
+                {isOrgInternalError && (
+                  <div className="mt-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-200 text-xs space-y-1">
+                    <div className="flex items-center gap-1.5 font-semibold text-amber-300">
+                      <HelpCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Resolution for Error 403 (org_internal):</span>
+                    </div>
+                    <p className="text-[11px] text-amber-200/90 leading-normal">
+                      The OAuth consent screen in Google Cloud Console must be set to <strong>User Type: External</strong>, and your Google email must be added under <strong>Test users</strong>.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons: Retry and Google Help */}
+              <div className="mt-5 pt-3.5 border-t border-slate-800 flex flex-wrap items-center gap-3">
+                <button
+                  onClick={handleGoogleSignIn}
+                  disabled={isSigningIn}
+                  className="flex-1 min-w-[140px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSigningIn ? 'animate-spin' : ''}`} />
+                  <span>{isSigningIn ? 'Retrying...' : 'Retry Sign In'}</span>
+                </button>
+
+                <a
+                  href="https://support.google.com/accounts/answer/12921413"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Google Sign-in Help</span>
+                </a>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

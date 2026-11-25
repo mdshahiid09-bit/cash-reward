@@ -8,8 +8,9 @@ A production-ready micro-earning platform built with **React 18, Vite, TypeScrip
 
 1. **Authentication:**
    - Google Sign-In only (Google OAuth via Supabase Auth).
-   - Welcome Bonus animation & audio fanfare on first login.
-   - Referral system with unique referral codes, share link (Web Share API), and bonus crediting.
+   - Dedicated Auth Landing Page with instant ₹25 Welcome Bonus badge.
+   - Protected Routes: unauthenticated users are redirected to `/login`.
+   - Diagnostics error banner with exact URL error parameter inspection, Retry button, and Google Sign-in Help link.
    - Account deletion option with permanent profile anonymization.
 
 2. **Offers & Task Verification:**
@@ -37,7 +38,7 @@ A production-ready micro-earning platform built with **React 18, Vite, TypeScrip
    - Full top 50 rankings with tie-breaker logic.
 
 6. **PWA & Offline Support:**
-   - Web App Manifest (`manifest.webmanifest`), service worker (`registerSW.js`).
+   - Web App Manifest (`manifest.webmanifest`), service worker (`dist/sw.js`).
    - Offline detection banner with live network status listener.
 
 7. **Theming & Personalization:**
@@ -48,15 +49,35 @@ A production-ready micro-earning platform built with **React 18, Vite, TypeScrip
 
 ---
 
+## 🔧 Google Cloud Console OAuth Configuration
+
+Ensure the following configuration is applied in your Google Cloud Console for the OAuth 2.0 Client:
+
+1. **OAuth Consent Screen:**
+   - **User Type**: Set to **External**.
+   - **Test users**: While in testing status, add your Google account email addresses under the "Test users" tab to allow them to sign in.
+
+2. **Authorized JavaScript origins:**
+   - Development: `http://localhost:5173`
+   - Production domain placeholder:
+     <!-- Production domain placeholder: Add https://your-production-domain.com here once deployed -->
+
+3. **Authorized redirect URIs:**
+   - Supabase Callback URL: `https://hkciawrgcqpometjlncb.supabase.co/auth/v1/callback`
+
+---
+
 ## 🚀 Running the Project Locally
 
 ```bash
-# Development server
-npm run dev
+# Start development server on port 5173
+cd ~/cash-reward && node node_modules/vite/bin/vite.js --host
 
-# Production preview
-node node_modules/vite/bin/vite.js preview --host
+# Or run production preview
+cd ~/cash-reward && node node_modules/vite/bin/vite.js preview --host --port 5173
 ```
+
+Open `http://localhost:5173` in your browser.
 
 ---
 
@@ -64,5 +85,5 @@ node node_modules/vite/bin/vite.js preview --host
 
 ```env
 VITE_SUPABASE_URL=https://hkciawrgcqpometjlncb.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrY2lhd3JnY3Fwb21ldGpsbmNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUzNTIyMjQsImV4cCI6MjExMDkyODIyNH0.Ne3q-0Z3V56cYm_L5aC4A4A7zVfnKMDhYgqlJnTJMnE
+VITE_SUPABASE_ANON_KEY=<ANON_KEY_FROM_SUPABASE_PROJECT>
 ```
